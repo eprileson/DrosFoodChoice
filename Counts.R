@@ -50,10 +50,12 @@ counts_first5<- counts %>%
 
 counts_last3 <- counts %>%
   subset(Week != 2) %>%
+  subset(Week != 4) %>%
   subset(Week != 3) %>%
   subset(Week != 5) %>%
   group_by(Week, Ovw_Cage, Choice, Food) %>%
-  mutate(avg_alive = mean(Active_alive))
+  mutate(avg_alive = mean(Active_alive)) %>%
+  mutate(prop.surv = Active_alive/1500)
 
 ##3. data viz:
 #raw data alive
@@ -90,21 +92,57 @@ ggplot(data = counts_last3, aes(x = Week, y = avg_alive, color = Food, shape = C
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
 
+#plotting proportion survival weeks 6 - 9
+ggplot(data = counts_last3, aes(x = Choice, y = prop.surv, color = Food))+
+  geom_point(size = 6, stat = "summary", fun = "mean",position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  geom_errorbar(linewidth = 1.5, width = 0.05, stat = "summary", fun.data = "mean_se",position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  scale_color_viridis_d()+
+  labs(x = "Choice", y = "Proportion survival", color = "Food treatment")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
+
 
 
 ##4. Modeling
+hist(sqrt(counts_last3$prop.surv)) #sqrt trans okay
 
+mod_prop <- glmmTMB(prop.surv ~ Choice*Food + (1|Cage), family = gaussian(link = "identity"),
+                    data = counts_last3)
 
 
 ##5. Model diagnostics
-
-
+test_sim <- simulateResiduals(mod_prop)
+plot(test_sim)
 
 ##6. Summary stats and Hypothesis testing
+summary(mod_prop) #effect of choice
 
+Anova(mod_prop, type = "III") #choice chi-sq = 7.48, P = 0.00624
 
+#no interaction, but interested in spec values: 
+em_choice <- emmeans(mod_prop, pairwise ~ Choice | Food, regrid = "response", adjust = "fdr")
+em_choice #reiterates above: effect of choice, not food
 
 ##7. Data visualization
+
+em_food.grid <- em_choice$emmeans %>%
+  confint() %>%
+  as.data.frame
+
+#Plot
+ggplot(data = em_food.grid, aes(x = Choice, y = emmean, color = Food))+
+  geom_point(size = 6, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  scale_color_viridis_d()+
+  labs(x = "Choice", y = "Proportion survival", color = "Food treatment")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
+
+  
 
 
 
