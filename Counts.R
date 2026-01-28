@@ -7,7 +7,7 @@ packages <- c("lubridate", "pwr", "pwrss", "reshape2", "devtools", "stats", "TMB
               "MARSS", "datasets", "magrittr", "tidyr", "dplyr", "forecast", 
               "ggplot2", "viridis", "MASS", "AICcmodavg", "glmmTMB", "lme4", "nlme",
               "ggeffects", "emmeans", "DHARMa", "car", "boot", "geepack", "cowplot", 
-              "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit")
+              "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit", "gtsummary")
 installed_packages <- packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
@@ -37,50 +37,6 @@ class(counts$Date)
 #remove week 4 (bad counts):
 counts <- counts %>%
   subset(Week != 4)
-
-#create new long format data frame with 'event' for each fly at each time point
-# 0 for dead, 1 for alive
-#code first
-
-install.packages("splitstackshape")
-library(splitstackshape) #to add ind rows
-
-counts_surv <- read.csv("Field_surv.cox.csv", header = TRUE)
-head(counts_surv)
-
-counts_surv[,c(4:7)] <- lapply(counts_surv[,c(4:7)], FUN = as.factor)
-
-#change date to date:
-counts_surv$Date <- ymd(counts_surv$Date)
-
-counts_surv <- counts_surv %>%
-  pivot_longer(cols = c("Corrected_Dead", "Active_alive"), #this section pivots the alive and dead col to be a single status column and number count col
-               names_to = "Status",
-               values_to = "Count") 
-counts_surv <- counts_surv %>%
-  group_by(Week, Ovw_Cage, Choice, Food) %>%
-  expandRows("Count") %>%
-  mutate(Event = ifelse(Status == "Corrected_Dead", 1, 0))
-
-
-counts_surv <- counts_surv %>%
-  slice(seq_len(n()), counts_surv$Count) %>%
-  mutate(Event = ifelse(Status == "Inactive_Dead", 1, 0)) %>%
-  select(-Count)
-  
-  
-counts_surv$Event <- 
-  uncount(!is.na(Count)) %>%
-  mutate(Event = ifelse(Status == "Inactive_Dead", 1, 0)) 
-  
-
-
-
-
-
-
-
-
 
 
 ##Group by only the first 5 or last 3 weeks (not including wk 4)
@@ -187,6 +143,77 @@ ggplot(data = em_food.grid, aes(x = Choice, y = emmean, color = Food))+
     axis.text = element_text(size = 16))
 
   
+
+
+
+##################################################################
+#################################################################
+#################################################################
+######## SURVIVAL ANALYSES : Cox Prop hazards model and Kaplan-Meier curves
+#################################
+#########################################################################
+
+#create new long format data frame with 'event' for each fly at each time point
+# 0 for dead, 1 for alive
+#code first
+
+#install.packages("splitstackshape")
+library(splitstackshape) #to add ind rows
+
+#read in data w. corrected dead counts from survival tab
+counts_surv <- read.csv("Field_surv.cox.csv", header = TRUE)
+head(counts_surv)
+
+#change cols to factors
+counts_surv[,c(3:7)] <- lapply(counts_surv[,c(3:7)], FUN = as.factor)
+
+#remove unreliable data from week 4
+counts_surv <- counts_surv %>%
+  subset(Week != "4")
+
+#change date to date:
+counts_surv$Date <- ymd(counts_surv$Date)
+
+##now create the event column for each ind fly
+#first, pivot to create a status column with respective alive / dead count
+#second, group and create row for each fly
+counts_surv <- counts_surv %>%
+  pivot_longer(cols = c("Corrected_Dead", "Active_alive"), #this section pivots the alive and dead col to be a single status column and number count col
+               names_to = "Status",
+               values_to = "Count") 
+counts_surv <- counts_surv %>%
+  group_by(Week, Ovw_Cage, Choice, Food) %>%
+  expandRows("Count") %>% #this expands the dataset to make a row for each fly from the number in the Count column
+  mutate(Event = ifelse(Status == "Corrected_Dead", 1, 0)) #this creates the status column of alive / dead (1/0)
+
+#now create time object as number of days
+counts_surv$Time <- 7 + (as.numeric(counts_surv$Week)*7)
+
+
+##survival analysis
+
+#first basic plot w/ survival object:
+survfit2(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
+  ggsurvfit() +
+  theme_classic()+
+  labs(x = "Day", y = "Survival probability") +
+  scale_color_viridis_d()+
+  scale_fill_viridis_d()+
+  add_confidence_interval()
+
+
+#quick estimate of x-day survival:
+summary(survfit(Surv(Time, Event) ~ Choice, data = counts_surv), times = 63)
+#over whole period:
+#choice: survival = 0.0214 (2.14%), SE = 0.000534
+#no choice: survival = 0.00666 (0.6%), SE = 0.000270
+
+#make table:
+survfit(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
+  tbl_survfit(
+    times = 63,
+    label_header = "**63 day survival (95% CI)**"
+  )
 
 
 
