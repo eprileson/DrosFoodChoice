@@ -7,7 +7,7 @@ packages <- c("lubridate", "pwr", "pwrss", "reshape2", "devtools", "stats", "TMB
               "MARSS", "datasets", "magrittr", "tidyr", "dplyr", "forecast", 
               "ggplot2", "viridis", "MASS", "AICcmodavg", "glmmTMB", "lme4", "nlme",
               "ggeffects", "emmeans", "DHARMa", "car", "boot", "geepack", "cowplot", 
-              "forcats", "visreg", "lubridate")
+              "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit")
 installed_packages <- packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
@@ -28,7 +28,7 @@ str(counts)
 ##2. Data wrangling
 
 #change fixed vars to factors:
-counts[,c(2:5)] <- lapply(counts[,c(2:5)], FUN = as.factor)
+counts[,c(4:7)] <- lapply(counts[,c(4:7)], FUN = as.factor)
 
 #change date to date:
 counts$Date <- ymd(counts$Date)
@@ -37,6 +37,50 @@ class(counts$Date)
 #remove week 4 (bad counts):
 counts <- counts %>%
   subset(Week != 4)
+
+#create new long format data frame with 'event' for each fly at each time point
+# 0 for dead, 1 for alive
+#code first
+
+install.packages("splitstackshape")
+library(splitstackshape) #to add ind rows
+
+counts_surv <- read.csv("Field_surv.cox.csv", header = TRUE)
+head(counts_surv)
+
+counts_surv[,c(4:7)] <- lapply(counts_surv[,c(4:7)], FUN = as.factor)
+
+#change date to date:
+counts_surv$Date <- ymd(counts_surv$Date)
+
+counts_surv <- counts_surv %>%
+  pivot_longer(cols = c("Corrected_Dead", "Active_alive"), #this section pivots the alive and dead col to be a single status column and number count col
+               names_to = "Status",
+               values_to = "Count") 
+counts_surv <- counts_surv %>%
+  group_by(Week, Ovw_Cage, Choice, Food) %>%
+  expandRows("Count") %>%
+  mutate(Event = ifelse(Status == "Corrected_Dead", 1, 0))
+
+
+counts_surv <- counts_surv %>%
+  slice(seq_len(n()), counts_surv$Count) %>%
+  mutate(Event = ifelse(Status == "Inactive_Dead", 1, 0)) %>%
+  select(-Count)
+  
+  
+counts_surv$Event <- 
+  uncount(!is.na(Count)) %>%
+  mutate(Event = ifelse(Status == "Inactive_Dead", 1, 0)) 
+  
+
+
+
+
+
+
+
+
 
 
 ##Group by only the first 5 or last 3 weeks (not including wk 4)
