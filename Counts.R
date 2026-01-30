@@ -7,7 +7,8 @@ packages <- c("lubridate", "pwr", "pwrss", "reshape2", "devtools", "stats", "TMB
               "MARSS", "datasets", "magrittr", "tidyr", "dplyr", "forecast", 
               "ggplot2", "viridis", "MASS", "AICcmodavg", "glmmTMB", "lme4", "nlme",
               "ggeffects", "emmeans", "DHARMa", "car", "boot", "geepack", "cowplot", 
-              "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit", "gtsummary")
+              "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit", "gtsummary",
+              "broom.helpers")
 installed_packages <- packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
@@ -193,33 +194,72 @@ counts_surv$Time <- 7 + (as.numeric(counts_surv$Week)*7)
 ##survival analysis
 
 #first basic plot w/ survival object:
-survfit2(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
-  ggsurvfit() +
+survfit2(Surv(Time, Event) ~ Choice + Food, data = counts_surv) %>%
+  ggsurvfit(linewidth = 1) +
   theme_classic()+
   labs(x = "Day", y = "Survival probability") +
   scale_color_viridis_d()+
   scale_fill_viridis_d()+
-  add_confidence_interval()
+  add_confidence_interval()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16)
+  )
 
 
 #quick estimate of x-day survival:
-summary(survfit(Surv(Time, Event) ~ Choice, data = counts_surv), times = 63)
+surv_mod <- survfit(Surv(Time, Event) ~ Choice + Food, data = counts_surv)
+summary(surv_mod, times = 63)
 #over whole period:
 #choice: survival = 0.0214 (2.14%), SE = 0.000534
 #no choice: survival = 0.00666 (0.6%), SE = 0.000270
 
+
 #make table:
 survfit(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
   tbl_survfit(
-    times = 63,
+    times = 40,
     label_header = "**63 day survival (95% CI)**"
   )
 
+## comparing survival between groups:
+#use log-rank test (equally weights observations over time)
+#testing just choice here:
+survdiff(Surv(Time, Event) ~ Choice, data = counts_surv)
+#Chisq = 3208, 1df, P < 0.0001
+
+## Cox regression model, can test both food and choice
+#can fit multi-regression models; assumes that hazards (risk of death) is proportional at each point in time
+cox_mod1 <- coxph(Surv(Time, Event) ~ Choice, data = counts_surv)
+#intersting, across whole period, food is also signif?
+cox_mod1 %>% tbl_regression(exp = TRUE)
+
+#test assumptions of proportional hazards:
+cz <- cox.zph(cox_mod1)
+cz #significant for choice, food, and interaction as hazards not being proportional
+plot(cz) #diagnostic plots verify that
+
+##Dealing with non-proportionality:
+#split the time of the dataset in half:
+counts_surv.split <- survSplit(Surv(Time, Event) ~ Choice + Food + Ovw_Cage, data = counts_surv,
+                               cut = c(49), episode = "tgroup", id = "id")
+  
+#new model :
+cox_mod2 <- coxph(Surv(tstart, Time, Event) ~ Choice, data = counts_surv.split)
+cox_mod2
+
+#try new fit to test proportionality:
+cox.zph(cox_mod2)
+
+#that did not work
 
 
+##could now try a time-dependent coefficient
+cox_mod3 <- coxph(formula = Surv(Time, Event) ~ Choice, data = counts_surv, 
+                  tt = function(x, t, ...) x*log(t + 20))
 
-
-
+#try new fit to test proportionality:
+cox.zph(cox_mod3)
 
 
 
