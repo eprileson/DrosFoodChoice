@@ -126,8 +126,8 @@ Anova(mod_prop, type = "III") #choice chi-sq = 7.48, P = 0.00624
 em_choice <- emmeans(mod_prop, pairwise ~ Choice | Food, regrid = "response", adjust = "fdr")
 em_choice #reiterates above: effect of choice, not food
 
-##7. Data visualization
 
+##7. Data visualization
 em_food.grid <- em_choice$emmeans %>%
   confint() %>%
   as.data.frame
@@ -160,6 +160,13 @@ ggplot(data = em_food.grid, aes(x = Choice, y = emmean, color = Food))+
 
 #install.packages("splitstackshape")
 library(splitstackshape) #to add ind rows
+install.packages("flexsurv")
+library(flexsurv)
+install.packages("SurvRegCensCov")
+library(SurvRegCensCov)
+install.packages("survminer")
+library(survminer)
+
 
 #read in data w. corrected dead counts from survival tab
 counts_surv <- read.csv("Field_surv.cox.csv", header = TRUE)
@@ -187,26 +194,25 @@ counts_surv <- counts_surv %>%
   expandRows("Count") %>% #this expands the dataset to make a row for each fly from the number in the Count column
   mutate(Event = ifelse(Status == "Corrected_Dead", 1, 0)) #this creates the status column of alive / dead (1/0)
 
-#now create time object as number of days
+#create time col as # of days
 counts_surv$Time <- 7 + (as.numeric(counts_surv$Week)*7)
 
-
 ##survival analysis
-
+#https://www.emilyzabor.com/survival-analysis-in-r.html#assessing-proportional-hazards
 #first basic plot w/ survival object:
 survfit2(Surv(Time, Event) ~ Choice + Food, data = counts_surv) %>%
   ggsurvfit(linewidth = 1) +
   theme_classic()+
   labs(x = "Day", y = "Survival probability") +
   scale_color_viridis_d()+
-  scale_fill_viridis_d()+
+  scale_fill_viridis_d(alpha = 0.25)+
   add_confidence_interval()+
   theme(
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16)
   )
 
-
+##Cox Prop Hazards approach:
 #quick estimate of x-day survival:
 surv_mod <- survfit(Surv(Time, Event) ~ Choice + Food, data = counts_surv)
 summary(surv_mod, times = 63)
@@ -230,14 +236,20 @@ survdiff(Surv(Time, Event) ~ Choice, data = counts_surv)
 
 ## Cox regression model, can test both food and choice
 #can fit multi-regression models; assumes that hazards (risk of death) is proportional at each point in time
-cox_mod1 <- coxph(Surv(Time, Event) ~ Choice, data = counts_surv)
+cox_mod1 <- coxph(Surv(Time, Event) ~ Choice + Food, data = counts_surv)
 #intersting, across whole period, food is also signif?
 cox_mod1 %>% tbl_regression(exp = TRUE)
+
+#hypothesis test:
+anova(cox_mod1)
 
 #test assumptions of proportional hazards:
 cz <- cox.zph(cox_mod1)
 cz #significant for choice, food, and interaction as hazards not being proportional
 plot(cz) #diagnostic plots verify that
+
+ggcoxdiagnostics(cox_mod1, type = "schoenfeld")
+
 
 ##Dealing with non-proportionality:
 #split the time of the dataset in half:
@@ -251,17 +263,39 @@ cox_mod2
 #try new fit to test proportionality:
 cox.zph(cox_mod2)
 
-#that did not work
-
-
 ##could now try a time-dependent coefficient
 cox_mod3 <- coxph(formula = Surv(Time, Event) ~ Choice, data = counts_surv, 
                   tt = function(x, t, ...) x*log(t + 20))
 
 #try new fit to test proportionality:
 cox.zph(cox_mod3)
+#Neither of these steps worked; still not meeting assumptions
 
 
+### Try parametric model approach
+# following this resource: https://bookdown.org/drki_musa/dataanalysis/parametric-survival-analysis.html
+#build a exponential survival model
+exp.mod.aft <- survreg(Surv(Time, Event) ~ Choice, data = counts_surv, dist = "exponential")
+summary(exp.mod.aft)
+
+
+#try Weibull distribution (Accelerated Failure Time, AFT)
+wei.mod.aft <- survreg(Surv(Time, Event) ~ Week + Choice, data = counts_surv, dist = "weibull")
+summary(wei.mod.aft)
+
+ConvertWeibull(wei.mod.aft, conf.level = 0.95)
+
+#use flexsurv() to get the log time ratio and time ratio of interest:
+wei.mod.aft.FLEX <- flexsurvreg(Surv(Time, Event) ~ Choice, data = counts_surv,
+                                dist = "weibull")
+#yields estimate of failure (death) over time such that the estimated log
+#time ratio for each measurement; ie., the acceleration factor
+summary(wei.mod.aft.FLEX)
+
+
+#plot model outputs: parallel lines indicate sufficient model fit:
+WeibullDiag(Surv(time = Time, event = Event == 1) ~ Choice + Food,
+            data = counts_surv)
 
 
 
