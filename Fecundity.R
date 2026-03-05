@@ -27,7 +27,7 @@ head(fec_choice)
 str(fec_choice)
 
 #change first four vars from character to factors
-fec_choice[,c(1:4)] <- lapply(fec_choice[,c(1:4)], as.factor)
+fec_choice[,c(1:5)] <- lapply(fec_choice[,c(1:5)], as.factor)
 
 
 #2
@@ -38,27 +38,28 @@ levels(fec_choice$Food) <- list(`Plant Food` = "PF", `Yeast Food` = "YF")
 
 #make bio rep average for fecundity:
 fec_choice <- fec_choice %>%
-  group_by(Cage, Choice, Food) %>%
+  group_by(Time, Cage, Choice, Food) %>%
   summarise(eggperfemday = mean(EggsPerFemale)) %>% #made the bio rep
   as.data.frame()
 
 
 #make SE manually:
 se_fec <- fec_choice %>%
-  group_by(Choice, Food) %>%
+  group_by(Time, Choice, Food) %>%
   summarise(mean = mean(eggperfemday),
             sd = sd(eggperfemday),
             se = sd/sqrt(8))
   
 #make raw data cage pts:
 fec_choice.r <- fec_choice %>%
-  group_by(Cage, Choice, Food) %>%
+  group_by(Time, Cage, Choice, Food) %>%
   summarise(mean = mean(eggperfemday)) %>%
   as.data.frame()
 
 
 #3
 ## data exploration
+#by choice and food within overwinter
 ggplot(data = fec_choice, aes(x = Choice, y = eggperfemday, color = Food)) +
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_point(data = fec_choice.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
@@ -69,6 +70,23 @@ ggplot(data = fec_choice, aes(x = Choice, y = eggperfemday, color = Food)) +
   theme(
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
+
+#across time, fall and post-winter
+ggplot(data = fec_choice, aes(x = Time, y = eggperfemday, group = 1)) +
+  geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_line(stat = "summary", fun = "mean", linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_point(data = fec_choice.r, aes(x = Time, y = mean), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  scale_color_viridis_d()+
+  labs(x = "Timepoint", y = "Eggs/Female/Day")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
+
+
+
+
 
 
 

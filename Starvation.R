@@ -29,14 +29,14 @@ str(starv)
 #2.
 ## data wrangling: 
 #change first four vars from character to factors
-starv[,c(1:4)] <- lapply(starv[,c(1:4)], as.factor)
+starv[,c(1:5)] <- lapply(starv[,c(1:5)], as.factor)
 
 #adjust labels for factors
 levels(starv$Choice) <- list(Choice = "C", `No Choice` = "NC")
 levels(starv$Food) <- list(`Plant Food` = "PF", `Yeast Food` = "YF")
 
 #change col names to hour lengths:
-colnames(starv) <- c("Cage", "Choice", "Food", "Rep", "Init", "12", "24",    
+colnames(starv) <- c("Time", "Cage", "Choice", "Food", "Rep", "Init", "12", "24",    
                      "36", "48", "60", "72" , "84", "96")
 #check
 head(starv)
@@ -62,26 +62,43 @@ starv.filtered <- starv %>%
 
 
 #group by bio rep:
-starv.filtered <- starv.filtered %>%
-  group_by(Cage, Choice, Food) %>%
+starv.filtered.fc <- starv.filtered %>%
+  group_by(Time, Cage, Choice, Food) %>%
   summarise(avg_hour = mean(Time_deathAvg)) %>%
-  as.data.frame()
+  as.data.frame() %>%
+  subset(Choice != "NA") %>%
+  subset(Food != "NA")
+
+#group for time comp
+starv.filtered.t <- starv.filtered %>%
+  group_by(Time, Cage, Choice, Food) %>%
+  summarise(avg_hour = mean(Time_deathAvg)) %>%
+  as.data.frame() 
 
 #manual SE calcs:
 se_calc.stv <- starv.filtered %>%
-  group_by(Choice, Food) %>%
+  group_by(Time, Choice, Food) %>%
   summarise(mean = mean(avg_hour),
             sd = sd(avg_hour),
             se = sd/sqrt(8))
 
 #raw data pts:
-starv.r <- starv.filtered %>%
-  group_by(Cage, Choice, Food) %>%
+starv.fc.r <- starv.filtered %>%
+  group_by(Time, Cage, Choice, Food) %>%
+  summarise(mean = mean(avg_hour)) %>%
+  subset(Choice != "NA") %>%
+  subset(Food != "NA") %>%
+  as.data.frame()
+
+#raw data for timepoint
+starv.t.r <- starv.filtered %>%
+  group_by(Time, Cage, Choice, Food) %>%
   summarise(mean = mean(avg_hour)) %>%
   as.data.frame()
+
   
 ### 3 data exploration
-
+#across food and choice treatments within winter
 ggplot(data = starv.filtered, aes(x = Choice, y = avg_hour, color = Food))+
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_point(data = starv.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
@@ -93,6 +110,18 @@ ggplot(data = starv.filtered, aes(x = Choice, y = avg_hour, color = Food))+
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
 
+#across timepoint - fall to winter
+ggplot(data = starv.filtered, aes(x = Time, y = avg_hour, group = 1, color = Food, shape = Choice))+
+  geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_line(stat = "summary", fun = "mean", linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_point(data = starv.r, aes(x = Time, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  scale_color_viridis_d()+
+  labs(x = "Timepoint", y = "Average time of death (hrs)")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
 
 
 #4 
