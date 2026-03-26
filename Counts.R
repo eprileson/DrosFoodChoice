@@ -60,7 +60,7 @@ counts_last3 <- counts %>%
 
 ##3. data viz:
 #raw data alive
-ggplot(data = counts, aes(x = Week, y = Active_alive.corrected, color = Food, shape = Choice))+
+ggplot(data = counts, aes(x = Week, y = Active_alive, color = Food, shape = Choice))+
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
   scale_color_viridis_d()+
