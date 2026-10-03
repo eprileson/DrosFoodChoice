@@ -105,7 +105,7 @@ ggplot(data = starv.filtered.fc, aes(x = Choice, y = avg_hour, color = Food))+
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_point(data = starv.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
-  scale_color_viridis_d()+
+  scale_color_manual(values = c("#223900","#ffa500"))+
   labs(x = "Choice", y = "Average time of death (hrs)", color = "Food treatment")+
   theme_classic()+
   theme(
@@ -188,6 +188,48 @@ Anova(stv_time.mod1, type = "III") #chisq = 0.230, P = 0.632
 em_stv1 <- emmeans(stv_mod1, pairwise ~ Choice | Food, adjust = "fdr")
 em_stv1
 
+
+#make dfs for plots:
+stv_em.dm <- em_stv1$emmeans %>%
+  confint() %>%
+  as.data.frame()
+
+stv_em.time.dm <- stv_em.time$emmeans %>%
+  confint() %>%
+  as.data.frame()
+
+
+##Visualization
+#food choice
+stv_legend <-
+  ggplot(data = stv_em.dm, aes(x = Choice, y = emmean, color = Food))+
+  geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0)) +
+  geom_point(data = starv.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0))+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  #guides(color = "none")+
+  labs(x = "Choice", y = "Average time of death (hrs)", color = "Food treatment")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16),
+    legend.title = element_text(size = 14),
+    legend.text= element_text(size = 12))
+
+#boxplot:
+stv_FINAL <-
+  ggplot(data = starv.filtered.fc, aes(x = Choice, y = avg_hour, color = Food))+
+  geom_boxplot()+
+  geom_point(data = starv.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.8, jitter.width = 0.2))+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  guides(color = "none")+
+  labs(x = "Choice", y = "Average time of death (hrs)", color = "Food treatment")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16),
+    legend.title = element_text(size = 14),
+    legend.text= element_text(size = 12))
 
 
 

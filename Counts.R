@@ -8,7 +8,7 @@ packages <- c("lubridate", "pwr", "pwrss", "reshape2", "devtools", "stats", "TMB
               "ggplot2", "viridis", "MASS", "AICcmodavg", "glmmTMB", "lme4", "nlme",
               "ggeffects", "emmeans", "DHARMa", "car", "boot", "geepack", "cowplot", 
               "forcats", "visreg", "lubridate", "knitr", "tibble", "survival", "ggsurvfit", "gtsummary",
-              "broom.helpers")
+              "broom.helpers", "splitstackshape", "coxme")
 installed_packages <- packages %in% rownames(installed.packages())
 if (any(installed_packages == FALSE)) {
   install.packages(packages[!installed_packages])
@@ -16,7 +16,6 @@ if (any(installed_packages == FALSE)) {
 
 #load packages:
 invisible(lapply(packages, library, character.only = TRUE))
-
 
 ##setwd
 setwd('C:/Users/prile/Documents/WSU_PhD/RudmanLab/Projects/FoodChoice/FoodChoice')
@@ -27,6 +26,12 @@ head(counts)
 str(counts)
 
 ##2. Data wrangling
+## data wrangling
+#adjust labels for factors
+levels(counts$Choice) <- list(Choice = "C", `No Choice` = "NC")
+levels(counts$Food) <- list(`Plant Food` = "PF", `Yeast Food` = "YF")
+
+
 
 #change fixed vars to factors:
 counts[,c(4:7)] <- lapply(counts[,c(4:7)], FUN = as.factor)
@@ -55,11 +60,11 @@ counts_last3 <- counts %>%
   subset(Week != 3) %>%
   subset(Week != 5) %>%
   group_by(Week, Ovw_Cage, Choice, Food) %>%
-  mutate(avg_alive = mean(Active_alive)) %>%
-  mutate(prop.surv = Active_alive/1500)
+  summarise(avg_alive = mean(Active_alive),
+            prop.surv = Active_alive/1500)
 
 ##3. data viz:
-#raw data alive
+#raw data alive, full winter
 ggplot(data = counts, aes(x = Week, y = Active_alive, color = Food, shape = Choice))+
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
@@ -109,8 +114,8 @@ ggplot(data = counts_last3, aes(x = Choice, y = prop.surv, color = Food))+
 ##4. Modeling
 hist(sqrt(counts_last3$prop.surv)) #sqrt trans okay
 
-mod_prop <- glmmTMB(prop.surv ~ Choice*Food + (1|Cage), family = gaussian(link = "identity"),
-                    data = counts_last3)
+mod_prop <- glmmTMB(prop.surv ~ Choice*Food + (1| Ovw_Cage), family = gaussian(link = "identity"),
+                    data = counts_last3 )
 
 
 ##5. Model diagnostics
@@ -182,6 +187,12 @@ counts_surv <- counts_surv %>%
 #change date to date:
 counts_surv$Date <- ymd(counts_surv$Date)
 
+## data wrangling
+#adjust labels for factors
+levels(counts_surv$Choice) <- list(Choice = "C", `No Choice` = "NC")
+levels(counts_surv$Food) <- list(`Plant Food` = "PF", `Yeast Food` = "YF")
+
+
 ##now create the event column for each ind fly
 #first, pivot to create a status column with respective alive / dead count
 #second, group and create row for each fly
@@ -199,18 +210,24 @@ counts_surv$Time <- 7 + (as.numeric(counts_surv$Week)*7)
 
 ##survival analysis
 #https://www.emilyzabor.com/survival-analysis-in-r.html#assessing-proportional-hazards
-#first basic plot w/ survival object:
+#Kaplan Meier survival plot:
+KM_surv <- 
 survfit2(Surv(Time, Event) ~ Choice + Food, data = counts_surv) %>%
   ggsurvfit(linewidth = 1) +
   theme_classic()+
   labs(x = "Day", y = "Survival probability") +
-  scale_color_viridis_d()+
-  scale_fill_viridis_d(alpha = 0.25)+
+  scale_color_manual(values = c("#009E73", "#CC79A7", "#0072B2", "#E69F00"))+
+  scale_fill_manual(values = c("#009E73", "#CC79A7", "#0072B2", "#E69F00"))+
   add_confidence_interval()+
   theme(
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16)
   )
+
+#save high res version of plot
+ggsave("KM_survival.jpg", plot = KM_surv, device = "jpeg", width = 8.8, 
+       height = 6.4, units = "in", dpi = 500, bg = "white")
+
 
 ##Cox Prop Hazards approach:
 #quick estimate of x-day survival:
@@ -220,7 +237,7 @@ summary(surv_mod, times = 63)
 #choice: survival = 0.0214 (2.14%), SE = 0.000534
 #no choice: survival = 0.00666 (0.6%), SE = 0.000270
 
-
+#Choice surv fit function:
 #make table:
 survfit(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
   tbl_survfit(
@@ -228,20 +245,41 @@ survfit(Surv(Time, Event) ~ Choice, data = counts_surv) %>%
     label_header = "**63 day survival (95% CI)**"
   )
 
+#Food surv fit function:
+#make table:
+survfit(Surv(Time, Event) ~ Food, data = counts_surv) %>%
+  tbl_survfit(
+    times = 40,
+    label_header = "**63 day survival (95% CI)**"
+  )
+
+
 ## comparing survival between groups:
-#use log-rank test (equally weights observations over time)
+#use log-rank test (equally weights observations over time) - note, strata groups within and among cages to account for variation; will run mixed cox model to control for potential pseudorep
 #testing just choice here:
-survdiff(Surv(Time, Event) ~ Choice, data = counts_surv)
-#Chisq = 3208, 1df, P < 0.0001
+
+surv.diff_mod <- survdiff(Surv(Time, Event) ~ Choice + strata(Ovw_Cage), data = counts_surv)
+#Choice: Chisq = 3208, 1df, P < 0.0001
+
+#now testing against food independently
+survdiff(Surv(Time, Event) ~ Food + strata(Ovw_Cage), data = counts_surv)
+#Food: Chisq = 63.8, 1df, p < 0.0001
 
 ## Cox regression model, can test both food and choice
 #can fit multi-regression models; assumes that hazards (risk of death) is proportional at each point in time
 cox_mod1 <- coxph(Surv(Time, Event) ~ Choice + Food, data = counts_surv)
-#intersting, across whole period, food is also signif?
+#intersting, across whole period, food is also signif; 
 cox_mod1 %>% tbl_regression(exp = TRUE)
+summary(cox_mod1)
+
+## mixed model to provide grouping structure
+#run a mixed model with coxme, then spit out table
+cox_mod.mix <- coxme(Surv(Time, Event) ~ Choice + Food + (1 | Ovw_Cage), data = counts_surv)
+cox_mod.mix %>% tbl_regression(exp = TRUE)
+summary(cox_mod.mix)
 
 #hypothesis test:
-anova(cox_mod1)
+Anova(cox_mod.mix)
 
 #test assumptions of proportional hazards:
 cz <- cox.zph(cox_mod1)
@@ -296,6 +334,26 @@ summary(wei.mod.aft.FLEX)
 #plot model outputs: parallel lines indicate sufficient model fit:
 WeibullDiag(Surv(time = Time, event = Event == 1) ~ Choice + Food,
             data = counts_surv)
+
+
+
+
+
+
+#########################
+########## 10 year temp averages:
+############################
+temp <- read.csv("weather.csv", skip = 2, header = TRUE)
+head(temp)
+
+
+
+
+
+
+
+
+
 
 
 

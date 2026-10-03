@@ -84,7 +84,7 @@ ggplot(data = fec_choice.c, aes(x = Choice, y = eggperfemday, color = Food)) +
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_point(data = fec_choice.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
-  scale_color_viridis_d()+
+  scale_color_manual(values = c("#223900","#ffa500"))+
   labs(x = "Choice treatment", y = "Eggs/Female/Day", color = "Food treatment")+
   theme_classic()+
   theme(

@@ -85,7 +85,7 @@ ggplot(data = dryMass.b, aes(x = Choice, y = avg_dmass, color = Food))+
   geom_point(stat = "summary", fun = "mean", size = 6, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+ 
   geom_point(data = dryMass.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(stat = "summary", fun.data = "mean_se",linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
-  scale_color_viridis_d()+
+  scale_color_manual(values = c("#223900","#ffa500"))+
   labs(x = "Choice treatment", y = "Dry mass (mg)", color = "Food treatment")+
   theme_classic()+
   theme(
@@ -184,16 +184,31 @@ dry_em.time.dm <- dry_em.time$emmeans %>%
 
 ##Visualization
 #food choice
-ggplot(data = dry_em.dm, aes(x = Choice, y = emmean, color = Food, group = 1))+
+dryMass_FINAL <-
+ggplot(data = dry_em.dm, aes(x = Choice, y = emmean, color = Food))+
   geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0)) +
   geom_point(data = dryMass.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0))+
-  scale_color_viridis_d()+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  guides(color = "none")+
   labs(x = "Choice treatment", y = "Dry mass (mg)")+
   theme_classic()+
   theme(
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
+
+dryMass_FINAL <-
+  ggplot(data = dryMass.b, aes(x = Choice, y = avg_dmass, color = Food))+
+  geom_boxplot()+
+  geom_point(data = dryMass.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.8, jitter.width = 0.2))+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  guides(color = "none")+
+  labs(x = "Choice treatment", y = "Dry mass (mg)")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
+
 
 #time plot
 ggplot(data = dry_em.time.dm, aes(x = Time, y = emmean, color = Time, group = 1))+
