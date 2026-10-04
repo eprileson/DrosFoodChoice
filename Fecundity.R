@@ -51,7 +51,7 @@ fec_choice.c <- fec_choice %>%
 
 #make bio rep average for time comparison
 fec_choice.t <- fec_choice %>%
-  group_by(Time, Cage, Choice, Food) %>%
+  group_by(Time, Cage) %>%
   summarise(eggperfemday = mean(EggsPerFemale)) %>% #made the bio rep
   as.data.frame()
 
@@ -81,7 +81,7 @@ fec_choice.t.r <- fec_choice.t %>%
 #by choice and food within overwinter
 fec_ovw <-
 ggplot(data = fec_choice.c, aes(x = Choice, y = eggperfemday, color = Food)) +
-  geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_point(stat = "summary", fun = "mean", size = 6, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_point(data = fec_choice.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
   scale_color_manual(values = c("#223900","#ffa500"))+
@@ -181,18 +181,33 @@ em_fec.t.df <- em_fect$emmeans %>%
 #7
 ##Visualization
 #food choice
-ggplot(data = em_fec.df, aes(x = Choice, y = emmean, color = Food, group = 1))+
-  geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0)) +
+ggplot(data = em_fec.df, aes(x = Choice, y = emmean, color = Food))+
+  geom_point(size = 6, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0))+
   geom_point(data = fec_choice.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
-  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0))+
-  scale_color_viridis_d()+
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0.2, seed = 0))+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  guides(color = "none")+
+  labs(x = "Choice treatment", y = "Eggs/Female/Day")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
+#make a box plot instead
+fec_FINAL <- 
+ggplot(data = fec_choice.c, aes(x = Choice, y = eggperfemday, color = Food))+
+  geom_boxplot()+
+  geom_point(data = fec_choice.r, aes(x = Choice, y = mean, color = Food), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.8, jitter.width = 0.2))+
+  scale_color_manual(values = c("#225000","#ffa500"))+
+  guides(color = "none")+
   labs(x = "Choice treatment", y = "Eggs/Female/Day")+
   theme_classic()+
   theme(
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
 
+
 #time plot
+fec_time.FINAL <-
 ggplot(data = em_fec.t.df, aes(x = Time, y = emmean, color = Time, group = 1))+
   geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_line(linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
@@ -206,8 +221,40 @@ ggplot(data = em_fec.t.df, aes(x = Time, y = emmean, color = Time, group = 1))+
     axis.title = element_text(size = 18),
     axis.text = element_text(size = 16))
 
-  
 
+
+
+
+#################################
+######################
+
+#PANEL PLOTS
+legend <- get_legend(stv_legend)
+labels <- c("(A)", "(B)", "(C)")
+
+phen_plot <- plot_grid(fec_FINAL, dryMass_FINAL, stv_FINAL, labels = labels, 
+                       label_fontface = "italic", label_fontfamily = "serif", 
+                       label_x = c(0.85, 0.85, 0.8), label_y = c(1, 1, 1), 
+                       label_size = 16, ncol = 3, nrow = 1, 
+                       rel_widths = c(0.33, 0.33, 0.3))
+final.phen_plot <- plot_grid(phen_plot, legend, rel_heights = c(2.5, 0.2), rel_widths = c(0.9, 0.1))
+
+ggsave("Phen.panelplot.jpg", plot = final.phen_plot, device = "jpeg", width = 12.4, 
+       height = 6.63, units = "in", dpi = 500, bg = "white")
+
+  
+#Timepoint Plot:
+labels.t <- c("(A)", "(B)", "(C)")
+
+time_plot <- plot_grid(fec_time.FINAL, dry_time.FINAL, stv_time.FINAL, labels = labels.t, 
+                       label_fontface = "italic", label_fontfamily = "serif", 
+                       label_x = c(0.85, 0.85, 0.85), label_y = c(1, 1, 1), 
+                       label_size = 16, ncol = 3, nrow = 1, 
+                       rel_widths = c(0.33, 0.33, 0.33))
+final.time_plot <- plot_grid(time_plot)
+
+ggsave("Time.panelplot.jpg", plot = final.time_plot, device = "jpeg", width = 12.4, 
+       height = 6.63, units = "in", dpi = 500, bg = "white")
 
 
 

@@ -53,7 +53,7 @@ dryMass.b <- dryMass %>%
 
 #rep with time
 dryMass.t <- dryMass %>%
-  group_by(Timepoint, Cage, Choice, Food) %>%
+  group_by(Timepoint, Cage) %>%
   summarise(avg_dmass = mean(mass.mg)) %>%
   as.data.frame()
 
@@ -170,7 +170,7 @@ dry_em1 <- emmeans(dry_mod1, pairwise ~ Food | Choice, adjust = "fdr")
 
 dry_em1
 
-dry_em.time <- emmeans(dry_modtime, pairwise ~ Timepoint)
+dry_em.time <- emmeans(dry_modtime, pairwise ~ Timepoint, adjust = "fdr")
 
 #make dfs for plots:
 dry_em.dm <- dry_em1$emmeans %>%
@@ -211,10 +211,11 @@ dryMass_FINAL <-
 
 
 #time plot
-ggplot(data = dry_em.time.dm, aes(x = Time, y = emmean, color = Time, group = 1))+
+dry_time.FINAL <-
+ggplot(data = dry_em.time.dm, aes(x = Timepoint, y = emmean, color = Timepoint, group = 1))+
   geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_line(linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
-  geom_point(data = dryMass.t.r, aes(x = Time, y = mean, color = Time), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_point(data = dryMass.t.r, aes(x = Timepoint, y = mean, color = Timepoint), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
   scale_color_manual(values = c("#440154", "#440154"))+
   guides(color = "none")+

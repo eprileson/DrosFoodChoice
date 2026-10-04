@@ -74,7 +74,7 @@ starv.filtered.fc <- starv.filtered %>%
 
 #group for time comp
 starv.filtered.t <- starv.filtered %>%
-  group_by(Time, Cage, Choice, Food) %>%
+  group_by(Time, Cage) %>%
   summarise(avg_hour = mean(Time_deathAvg)) %>%
   as.data.frame() 
 
@@ -121,7 +121,7 @@ stv_time <-
 ggplot(data = starv.filtered.t, aes(x = Time, y = avg_hour, group = 1, color = Time))+
   geom_point(stat = "summary", fun = "mean", size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
   geom_line(stat = "summary", fun = "mean", linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
-  geom_point(data = starv.t.r, aes(x = Time, y = mean), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_point(data = starv.t.r, aes(x = Time, y = mean, color = Time), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
   geom_errorbar(stat = "summary", fun.data = "mean_se", linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
   guides(color = "none") +
   scale_color_manual(values = c("#440154", "#440154"))+
@@ -188,13 +188,14 @@ Anova(stv_time.mod1, type = "III") #chisq = 0.230, P = 0.632
 em_stv1 <- emmeans(stv_mod1, pairwise ~ Choice | Food, adjust = "fdr")
 em_stv1
 
+em_stv1.t <- emmeans(stv_time.mod1, pairwise ~ Time, adjust = "fdr")
 
 #make dfs for plots:
 stv_em.dm <- em_stv1$emmeans %>%
   confint() %>%
   as.data.frame()
 
-stv_em.time.dm <- stv_em.time$emmeans %>%
+stv_em.time.dm <- em_stv1.t$emmeans %>%
   confint() %>%
   as.data.frame()
 
@@ -231,8 +232,34 @@ stv_FINAL <-
     legend.title = element_text(size = 14),
     legend.text= element_text(size = 12))
 
+#time plot:
+stv_time.FINAL <- 
+ggplot(data = stv_em.time.dm, aes(x = Time, y = emmean, color = Time, group = 1))+
+  geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_line(linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_point(data = starv.t.r, aes(x = Time, y = mean, color = Time), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  guides(color = "none") +
+  scale_color_manual(values = c("#440154", "#440154"))+
+  labs(x = "Timepoint", y = "Average time of death (hrs)")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
 
 
+stv_legend.t <- 
+ggplot(data = stv_em.time.dm, aes(x = Time, y = emmean, color = Time, group = 1))+
+  geom_point(size = 6,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_line(linewidth = 1.5, position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0)) +
+  geom_point(data = starv.t.r, aes(x = Time, y = mean, color = Time), inherit.aes = FALSE, size = 3, alpha = 0.25, stroke = 1, position = position_jitterdodge(dodge.width = 0.2, jitter.width = 0.5))+
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), linewidth = 1.5, width = 0.1,position = position_jitterdodge(dodge.width = 0.5, jitter.width = 0))+
+  scale_color_manual(values = c("#440154", "#440154"))+
+  labs(x = "Timepoint", y = "Average time of death (hrs)")+
+  theme_classic()+
+  theme(
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 16))
 
 
 
