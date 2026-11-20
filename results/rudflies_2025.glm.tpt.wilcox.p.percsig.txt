@@ -1,0 +1,11 @@
+contrast	perc_sig
+T0-T1.pval	16
+T0-T2.pval	0
+T0-T3.pval	3
+T0-T4.pval	0.1
+T1-T2.pval	36.5
+T1-T3.pval	93.1
+T1-T4.pval	4.4
+T2-T3.pval	0.1
+T2-T4.pval	0.8
+T3-T4.pval	20.9
